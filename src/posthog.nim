@@ -1,3 +1,51 @@
+##[
+
+Hello there! This is a relatively simple library for using Posthog 
+open-source product analytics service. 
+
+Right now there's not a lot
+of stuff implemented, but it is already useable.
+
+Most of the library usage is shown below.
+
+Create a new Posthog client with the specified api key
+and ``distinctId`` being ``myuser`` to not specify it in every call.
+```nim
+let client = newPosthogClient("myApiKey", "myuser")
+```
+By default this uses the official PostHug SaaS instance, but 
+you can override it by specifying the URL yourself:
+```nim
+let client = newPosthogClient("https://myurl.com/capture", "myApiKey", "myuser")
+```
+
+Identify the user - so that Posthog will remember them and you can also
+attach some fields to the user:
+```nim
+client.identify(
+  email = "john@doe.com",
+  proUser = false
+)
+```
+Internally ``identify`` uses ``json``'s ``%*`` macro, so most types will 
+be automatically supported. If you need to handle a type not supported 
+by the ``%*`` macro  (but that's really rare), you will need to write 
+a ``%`` proc for it
+
+Capture some event:
+```nim
+client.capture(
+  event = "myevent",
+  putNumber = 5
+)
+```
+
+Most calls like ``identify`` or ``capture`` in this library rely on a macro
+to automatically transform all arguments to necessary JSON objects. The macro
+also handles special cases like ``timestamp``, ``distinctId``, ``event`` or others,
+so you shouldn't generally worry about the library overriding them 
+(if you want to specify them manually).
+]##
 import std / [
   sequtils,
   times,
@@ -14,17 +62,22 @@ type
   PosthogClientBase[HttpBase] = ref object
     apiUrl: string
     apiKey: string
-    distinctId: string
+    distinctId*: string
 
-  PosthogClient = PosthogClientBase[HttpClient]
-  AsyncPosthogClient = PosthogClientBase[AsyncHttpClient]
+  PosthogClient* = PosthogClientBase[HttpClient]
+  AsyncPosthogClient* = PosthogClientBase[AsyncHttpClient]
 
 const
-  PosthogCaptureUrl* = "https://app.posthog.com/capture/"
+  PosthogCaptureUrl* = "https://app.posthog.com/capture/" ## \
+    ## URL for the official Posthog instance (SaaS on https://posthog.com/trial)
   PosthogLib = "posthog-nim"
   PosthogLibVersion = "0.0.1"
 
 proc newPosthogClient*(url = PosthogCaptureUrl, apiKey: string, distinctId = ""): PosthogClient =
+  ## Creates a new PosthogClient with the instance URL from ``url``,
+  ## ``apiKey`` for authorization and optionally ``distinctId`` to not
+  ## set it for each call (you can overwrite it at any time
+  ## later or still specify it in calls)
   result = PosthogClient(
     apiUrl: url,
     apiKey: apiKey,
@@ -102,7 +155,27 @@ macro makeTableConstr(data: varargs[untyped]): untyped =
   echo treeRepr result
 
 template identify*(client: PosthogClient, data: varargs[untyped]) =
+  ## Identify the current user (create or update user data in Posthog)
+  ## with specified parameters, for example:
+  ##
+  ## ```nim
+  ## client.identify(
+  ##   email = "john@doe.com",
+  ##   proUser = false,
+  ##   distinctId = "test" # override the distinctId set in client
+  ## )
+  ## ```
   client.send(Identify, makeTableConstr(data))
 
 template capture*(client: PosthogClient, data: varargs[untyped]) =
+  ## Capture an event with some parameters, for example:
+  ##
+  ## ```nim
+  ## client.capture(
+  ##   event = "purchase",
+  ##   moneySpent = 100,
+  ##   paymentService = "paypal",
+  ##   itemBought = "Ultimate Excalibur Sword"
+  ## )
+  ## ```
   client.send(Capture, makeTableConstr(data))
