@@ -3,26 +3,31 @@
 Hello there! This is a relatively simple library for using Posthog 
 open-source product analytics service. 
 
-Right now there's not a lot
-of stuff implemented, but it is already useable.
-
-Most of the library usage is shown below.
+Right now there's not a lot of stuff implemented, 
+but it is already useable. Just read the example below 
+and you'll be able to use this brary :)
 
 Create a new Posthog client with the specified api key
 and ``distinctId`` being ``myuser`` to not specify it in every call.
 ```nim
-let client = newPosthogClient("myApiKey", "myuser")
+let client = newPosthogClient(apiKey = "myApiKey", user = "myuser")
 ```
 By default this uses the official PostHug SaaS instance, but 
 you can override it by specifying the URL yourself:
 ```nim
-let client = newPosthogClient("https://myurl.com/capture", "myApiKey", "myuser")
+let client = newPosthogClient(
+  url = "https://myurl.com/capture", 
+  apiKey = "myApiKey", 
+  user = "myuser"
+)
 ```
 
 Identify the user - so that Posthog will remember them and you can also
 attach some fields to the user:
 ```nim
 client.identify(
+  # specify event name for Posthog
+  event = "logged in",
   email = "john@doe.com",
   proUser = false
 )
@@ -35,8 +40,8 @@ a ``%`` proc for it
 Capture some event:
 ```nim
 client.capture(
-  event = "myevent",
-  putNumber = 5
+  event = "logged out",
+  reason = "AppExit"
 )
 ```
 
@@ -46,8 +51,8 @@ also handles special cases like ``timestamp``, ``distinctId``, ``event`` or othe
 so you shouldn't generally worry about the library overriding them 
 (if you want to specify them manually).
 ]##
+
 import std / [
-  sequtils,
   times,
   strformat, json, oids,
   httpclient, asyncdispatch,
@@ -56,16 +61,19 @@ import std / [
 
 type
   PosthogEventKind = enum
-    Identify = "identify",
+    Identify = "identify", 
     Capture = "capture"
 
-  PosthogClientBase[HttpBase] = ref object
+  PosthogClientBase*[HttpBase] = ref object
+    ## Base object for async/sync client instances
     apiUrl: string
     apiKey: string
-    distinctId*: string
+    distinctId*: string ## You can override distinctId at any time
 
-  PosthogClient* = PosthogClientBase[HttpClient]
-  AsyncPosthogClient* = PosthogClientBase[AsyncHttpClient]
+  PosthogClient* = PosthogClientBase[HttpClient] ## \
+    ## Synchronous Posthog client instance
+  AsyncPosthogClient* = PosthogClientBase[AsyncHttpClient] ## \
+    ## Asynchronous Posthog client instance
 
 const
   PosthogCaptureUrl* = "https://app.posthog.com/capture/" ## \
@@ -73,22 +81,22 @@ const
   PosthogLib = "posthog-nim"
   PosthogLibVersion = "0.0.1"
 
-proc newPosthogClient*(url = PosthogCaptureUrl, apiKey: string, distinctId = ""): PosthogClient =
+proc newPosthogClient*(url = PosthogCaptureUrl, apiKey: string, user = ""): PosthogClient =
   ## Creates a new PosthogClient with the instance URL from ``url``,
-  ## ``apiKey`` for authorization and optionally ``distinctId`` to not
-  ## set it for each call (you can overwrite it at any time
-  ## later or still specify it in calls)
+  ## ``apiKey`` for authorization and optionally ``user``
+  ## (Posthog's ``distinctId``) to not set it for each call 
+  ## (you can overwrite it at any time later or still specify it in calls)
   result = PosthogClient(
     apiUrl: url,
     apiKey: apiKey,
-    distinctId: if distinctId == "": $genOid() else: distinctId
+    distinctId: if user == "": $genOid() else: user
   )
 
-proc newAsyncPosthogClient*(url = PosthogCaptureUrl, apiKey: string, distinctId = ""): AsyncPosthogClient =
+proc newAsyncPosthogClient*(url = PosthogCaptureUrl, apiKey: string, user = ""): AsyncPosthogClient =
   result = AsyncPosthogClient(
     apiUrl: url,
     apiKey: apiKey,
-    distinctId: if distinctId == "": $genOid() else: distinctId
+    distinctId: if user == "": $genOid() else: user
   )
 
 proc send(client: PosthogClient | AsyncPosthogClient, kind: PosthogEventKind,
@@ -151,8 +159,6 @@ macro makeTableConstr(data: varargs[untyped]): untyped =
 
   result = quote do:
     `jsonMacro`(`table`)
-  echo repr result
-  echo treeRepr result
 
 template identify*(client: PosthogClient, data: varargs[untyped]) =
   ## Identify the current user (create or update user data in Posthog)
