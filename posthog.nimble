@@ -1,7 +1,7 @@
 # Package
 
 version       = "0.1.0"
-author        = "Danil Yarantsev"
+author        = "Danil Yarantsev (Yardanico)"
 description   = "Nim wrapper for Posthog product analytics service"
 license       = "MIT"
 srcDir        = "src"
