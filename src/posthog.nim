@@ -109,7 +109,7 @@ proc send(client: PosthogClient | AsyncPosthogClient, kind: PosthogEventKind,
     msg["distinct_id"] = %client.distinctId
 
   if "timestamp" notin msg:
-    msg["timestamp"] = % $now()
+    msg["timestamp"] = % $getTime().utc()
 
   msg["properties"]["$lib"] = %PosthogLib
   msg["properties"]["$lib_version"] = %PosthogLibVersion
